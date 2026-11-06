@@ -45,11 +45,13 @@ class Installer(DistributionInstaller, distribution=Distribution.arch):
                     f.write("\n[options]\n")
                     f.write("SigLevel = Never\n")
 
+                keyring_pkg = "archlinux-keyring" if not context.config.architecture.is_arm_variant() else "archports-keyring"
+
                 # We can't download a package without a dependencies without listing them in
                 # --assume-installed. Luckily archlinux-keyring only depends on pacman.
                 Pacman.install(
                     context,
-                    ["archlinux-keyring"],
+                    [keyring_pkg],
                     apivfs=False,
                     options=["--downloadonly", "--assume-installed", "pacman"],
                 )
@@ -61,11 +63,11 @@ class Installer(DistributionInstaller, distribution=Distribution.arch):
                         / "cache"
                         / Pacman.subdir(context.config)
                         / "pkg"
-                    ).glob("archlinux-keyring-*.pkg.tar*")
+                    ).glob(f"{keyring_pkg}-*.pkg.tar*")
                     if not p.name.endswith(".sig")
                 )
                 if not packages:
-                    die("Could not find archlinux-keyring package in cache directory after downloading it")
+                    die(f"Could not find {keyring_pkg} package in cache directory after downloading it")
 
                 extract_tar(
                     packages[-1],
@@ -96,7 +98,7 @@ class Installer(DistributionInstaller, distribution=Distribution.arch):
                 if context.config.snapshot and not context.config.mirror:
                     die("There is no known public mirror for snapshots of Arch Linux ARM")
 
-                mirror = context.config.mirror or "http://mirror.archlinuxarm.org"
+                mirror = context.config.mirror or "https://arch-linux-repo.drzee.net/arch"
             else:
                 if context.config.mirror:
                     mirror = context.config.mirror
@@ -107,8 +109,6 @@ class Installer(DistributionInstaller, distribution=Distribution.arch):
 
             if context.config.snapshot:
                 url = join_mirror(mirror, f"repos/{context.config.snapshot}/$repo/os/$arch")
-            elif context.config.architecture.is_arm_variant():
-                url = join_mirror(mirror, "$arch/$repo")
             else:
                 url = join_mirror(mirror, "$repo/os/$arch")
 
@@ -129,7 +129,7 @@ class Installer(DistributionInstaller, distribution=Distribution.arch):
             ] + ["core", "extra"]
 
             if context.config.architecture.is_arm_variant():
-                repos += ["alarm"]
+                repos += ["forge"]
 
             for repo in repos:
                 yield PacmanRepository(repo, url)
@@ -139,7 +139,6 @@ class Installer(DistributionInstaller, distribution=Distribution.arch):
         a = {
             Architecture.x86_64: "x86_64",
             Architecture.arm64:  "aarch64",
-            Architecture.arm:    "armv7h",
         }.get(arch)  # fmt: skip
 
         if not a:
